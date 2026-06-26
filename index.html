@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Eletiva: Corpo em Movimento</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: none; }
+        :root {
+            --primary: #12002b; 
+            --accent: #ff007f; 
+            --accent-cyan: #00f3ff;
+            --bg-gradient: linear-gradient(135deg, #0e001f 0%, #1a003c 100%);
+            --white: #ffffff;
+            --text-light: #f3f4f6;
+            --text-muted: #9ca3af;
+            --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-light);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #bgCanvas { 
+            position: fixed; 
+            inset: 0; 
+            z-index: -1; 
+            opacity: 0.25; 
+            pointer-events: none; 
+        }
+
+        /* Cursores Personalizados */
+        #cursor {
+            width: 8px; height: 8px; background: var(--accent-cyan);
+            border-radius: 50%; position: fixed; pointer-events: none; z-index: 10000;
+            transform: translate(-50%, -50%); transition: width 0.15s, height 0.15s;
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+        #cursor-follower {
+            width: 36px; height: 36px; border: 1.5px solid var(--accent);
+            border-radius: 50%; position: fixed; pointer-events: none; z-index: 9999;
+            transform: translate(-50%, -50%); transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            #cursor, #cursor-follower { display: none; }
+            * { cursor: auto; }
+        }
+
+        .stage {
+            width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+
+        .slider-container { width: 100%; max-width: 1400px; height: 85vh; position: relative; }
+
+        .slide {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; opacity: 0; visibility: hidden;
+            transform: scale(0.96) translateY(20px); transition: all 0.8s var(--ease-smooth);
+        }
+        .slide.active { opacity: 1; visibility: visible; transform: scale(1) translateY(0); }
+
+        /* Estilo da Capa */
+        .cover-content {
+            text-align: center;
+            max-width: 1000px;
+            animation: pulseBg 8s infinite alternate;
+            padding: 45px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+        }
+        .cover-badge {
+            display: inline-block; padding: 6px 18px; 
+            background: linear-gradient(90deg, var(--accent) 0%, #a200ff 100%);
+            color: white; border-radius: 50px; font-size: 0.9rem; font-weight: 800;
+            margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 4px 15px rgba(255, 0, 127, 0.4);
+        }
+        .cover-title {
+            font-size: 4.5rem; font-weight: 900; line-height: 1.1;
+            background: linear-gradient(135deg, #fff 30%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 20px; letter-spacing: -1px;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .cover-professor {
+            font-size: 1.8rem; color: var(--text-light); font-weight: 500;
+            opacity: 0.9; display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .cover-professor span { color: var(--accent-cyan); font-weight: 700; }
+
+        /* Layout Media */
+        .media-header {
+            width: 100%; display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; padding: 0 10px;
+        }
+        .media-title {
+            font-size: 1.4rem; font-weight: 800; display: flex; align-items: center; gap: 10px;
+            color: var(--text-light); text-transform: uppercase; letter-spacing: 1px;
+        }
+        .media-title i { color: var(--accent); }
+        .media-filename {
+            font-family: monospace; font-size: 0.85rem; color: var(--accent-cyan);
+            background: rgba(0, 243, 255, 0.1); padding: 4px 12px; border-radius: 6px;
+            border: 1px solid rgba(0, 243, 255, 0.2);
+        }
+        
+        .media-frame {
+            width: 100%; height: calc(100% - 60px); border-radius: 20px; overflow: hidden;
+            background: #000; border: 3px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .media-frame video, .media-frame img {
+            width: 100%; height: 100%; object-fit: contain; z-index: 2; position: relative;
+        }
+
+        .media-placeholder {
+            position: absolute; inset: 0; background: linear-gradient(135deg, #12002b 0%, #29004f 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px; text-align: center; color: var(--text-light); z-index: 1;
+        }
+
+        /* Slide Final */
+        .thanks-card {
+            text-align: center; max-width: 900px; padding: 50px; border-radius: 24px;
+            background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05);
+            backdrop-filter: blur(15px); position: relative; overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+        }
+        .thanks-card::before {
+            content: ''; position: absolute; inset: 0; border-radius: 24px;
+            padding: 2px; background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+        }
+        .thanks-title {
+            font-size: 6rem; font-weight: 900; margin-bottom: 20px;
+            background: linear-gradient(90deg, #fff 0%, var(--accent) 50%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            letter-spacing: -2px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.3));
+        }
+        .thanks-sub {
+            font-size: 1.5rem; color: var(--text-light); opacity: 0.8; font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        /* Navegação */
+        .progress-wrap { position: fixed; top: 0; left: 0; width: 100%; height: 6px; background: rgba(255,255,255,0.05); z-index: 1000; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent) 0%, var(--accent-cyan) 100%); width: 0%; transition: width 0.3s ease; }
+
+        .nav-bar {
+            position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 20px; padding: 12px 25px;
+            background: rgba(18, 0, 43, 0.85); border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(15px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 1000;
+        }
+        .nav-btn, .music-btn {
+            background: none; border: none; color: var(--text-light); font-size: 1.1rem;
+            width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; transition: all 0.2s var(--ease-smooth);
+        }
+        .nav-btn:hover, .music-btn:hover { background: rgba(255, 255, 255, 0.15); color: var(--accent-cyan); scale: 1.1; }
+        .music-btn { color: var(--accent-cyan); }
+        .count { font-family: 'Inter', sans-serif; font-weight: 800; color: var(--text-light); font-size: 0.95rem; letter-spacing: 1px; min-width: 80px; text-align: center; }
+
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes pulseBg { 0% { box-shadow: 0 0 40px rgba(255,0,127,0.1); } 100% { box-shadow: 0 0 70px rgba(0,243,255,0.15); } }
+
+        @media (max-width: 900px) {
+            .cover-title { font-size: 2.2rem; }
+            .thanks-title { font-size: 3.2rem; }
+            .nav-bar { gap: 10px; padding: 10px 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Música de Fundo -->
+    <audio id="bgMusic" src="assets/musica.mp3" loop preload="auto"></audio>
+
+    <div class="progress-wrap"><div class="progress-bar" id="pBar"></div></div>
+    <canvas id="bgCanvas"></canvas>
+    <div id="cursor"></div>
+    <div id="cursor-follower"></div>
+
+    <div class="stage">
+        <div class="slider-container" id="slider"></div>
+    </div>
+
+    <nav class="nav-bar">
+        <button class="music-btn" id="musicToggle" title="Ligar/Desligar Música">
+            <i class="fa-solid fa-volume-high"></i>
+        </button>
+        <button class="nav-btn" id="prevBtn" title="Anterior"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="count" id="counter">1 / 20</div>
+        <button class="nav-btn" id="nextBtn" title="Próximo"><i class="fa-solid fa-arrow-right"></i></button>
+    </nav>
+
+    <script>
+        (function(){
+            "use strict";
+
+            // --- Lógica da Música ---
+            const audio = document.getElementById('bgMusic');
+            const musicBtn = document.getElementById('musicToggle');
+            const musicIcon = musicBtn.querySelector('i');
+            let isMusicPlaying = false;
+
+            function toggleMusic() {
+                if (audio.paused) {
+                    audio.play().then(() => {
+                        isMusicPlaying = true;
+                        musicIcon.className = 'fa-solid fa-volume-high';
+                    }).catch(e => console.log("Erro ao tocar música:", e));
+                } else {
+                    audio.pause();
+                    isMusicPlaying = false;
+                    musicIcon.className = 'fa-solid fa-volume-xmark';
+                }
+            }
+
+            // Tentar tocar música na primeira interação (devido às políticas dos navegadores)
+            document.addEventListener('click', function startMusicOnce() {
+                if(!isMusicPlaying) {
+                    audio.play().then(() => {
+                        isMusicPlaying = true;
+                        musicIcon.className = 'fa-solid fa-volume-high';
+                    });
+                }
+                document.removeEventListener('click', startMusicOnce);
+            }, { once: true });
+
+            musicBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Evita conflitos com o listener acima
+                toggleMusic();
+            });
+
+
+            // --- Fundo de Partículas ---
+            const canvas = document.getElementById('bgCanvas');
+            const ctx = canvas.getContext('2d');
+            let w = canvas.width = window.innerWidth;
+            let h = canvas.height = window.innerHeight;
+            
+            const particles = Array.from({length: 40}, () => ({
+                x: Math.random() * w, y: Math.random() * h,
+                radius: Math.random() * 2 + 1,
+                vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
+                alpha: Math.random() * 0.4 + 0.2
+            }));
+
+            function drawBackground() {
+                ctx.clearRect(0, 0, w, h);
+                particles.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > w) p.vx *= -1;
+                    if (p.y < 0 || p.y > h) p.vy *= -1;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 243, 255, ${p.alpha})`; ctx.fill();
+                });
+                requestAnimationFrame(drawBackground);
+            }
+            drawBackground();
+
+            window.addEventListener('resize', () => {
+                w = canvas.width = window.innerWidth;
+                h = canvas.height = window.innerHeight;
+            });
+
+
+            // --- Dados dos Slides ---
+            const slideData = [
+                { type: "cover", badge: "Eletiva", title: "Corpo em Movimento", professors: "Bruna e Genilton" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide3.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide4.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide5.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide6.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide7.mp4" },
+                { type: "image", title: "Apresentação de Prática", file: "assets/slide8.png" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide9.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide10.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide11.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide12.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide13.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide14.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide15.mp4" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide16.mp4" },
+                { type: "image", title: "Apresentação de Prática", file: "assets/slide17.png" },
+                { type: "image", title: "Apresentação de Prática", file: "assets/slide18.png" },
+                { type: "image", title: "Apresentação de Prática", file: "assets/slide19.png" },
+                { type: "video", title: "Vídeo Demonstrativo", file: "assets/slide20.mp4" },
+                { type: "thanks", title: "Obrigado!", subtitle: "Eletiva: Corpo em Movimento • Profs: Bruna e Genilton" }
+            ];
+
+            const slider = document.getElementById('slider');
+            const counter = document.getElementById('counter');
+            const pBar = document.getElementById('pBar');
+            let currentIndex = 0;
+
+            function buildSlides() {
+                slider.innerHTML = '';
+                slideData.forEach((slide, i) => {
+                    const slideEl = document.createElement('div');
+                    slideEl.className = `slide ${i === 0 ? 'active' : ''}`;
+                    
+                    if (slide.type === "cover") {
+                        slideEl.innerHTML = `<div class="cover-content"><span class="cover-badge">${slide.badge}</span><h1 class="cover-title">${slide.title}</h1><p class="cover-professor">Professores: <span>${slide.professors}</span></p></div>`;
+                    } else if (slide.type === "video") {
+                        slideEl.innerHTML = `<div class="media-header"><div class="media-title"><i class="fa-solid fa-video"></i> ${slide.title}</div><span class="media-filename">${slide.file.split('/').pop()}</span></div><div class="media-frame"><video src="${slide.file}" controls loop playsinline preload="auto" muted style="width:100%;height:100%;display:block;" onloadeddata="this.style.zIndex='3';"></video><div class="media-placeholder"><i class="fa-solid fa-circle-play" style="font-size:3rem;color:var(--accent)"></i><p>Carregando Vídeo...</p></div></div>`;
+                    } else if (slide.type === "image") {
+                        slideEl.innerHTML = `<div class="media-header"><div class="media-title"><i class="fa-regular fa-image"></i> ${slide.title}</div><span class="media-filename">${slide.file.split('/').pop()}</span></div><div class="media-frame"><img src="${slide.file}" style="width:100%;height:100%;display:block;" onload="this.style.zIndex='3';"/><div class="media-placeholder"><i class="fa-regular fa-image" style="font-size:3rem;color:var(--accent)"></i><p>Carregando Imagem...</p></div></div>`;
+                    } else if (slide.type === "thanks") {
+                        slideEl.innerHTML = `<div class="thanks-card"><h1 class="thanks-title">${slide.title}</h1><p class="thanks-sub">${slide.subtitle}</p></div>`;
+                    }
+                    slider.appendChild(slideEl);
+                });
+            }
+
+            function goToSlide(step) {
+                const slides = document.querySelectorAll('.slide');
+                const currentSlide = slides[currentIndex];
+                const activeVideo = currentSlide.querySelector('video');
+                if (activeVideo) activeVideo.pause();
+
+                currentSlide.classList.remove('active');
+                currentIndex = (currentIndex + step + slides.length) % slides.length;
+                
+                const nextSlide = slides[currentIndex];
+                nextSlide.classList.add('active');
+                
+                const nextVideo = nextSlide.querySelector('video');
+                if (nextVideo) { 
+                    nextVideo.currentTime = 0; 
+                    nextVideo.muted = true; 
+                    nextVideo.play().catch(() => {});
+                }
+
+                counter.innerText = `${currentIndex + 1} / ${slideData.length}`;
+                pBar.style.width = `${((currentIndex + 1) / slideData.length) * 100}%`;
+            }
+
+            document.getElementById('prevBtn').addEventListener('click', () => goToSlide(-1));
+            document.getElementById('nextBtn').addEventListener('click', () => goToSlide(1));
+
+            document.onkeydown = e => {
+                if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); goToSlide(1); }
+                if (e.key === "ArrowLeft") { e.preventDefault(); goToSlide(-1); }
+            };
+
+            // Cursor personalizado
+            const c = document.getElementById('cursor');
+            const f = document.getElementById('cursor-follower');
+            document.onmousemove = e => {
+                c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+                f.animate({ left: e.clientX + 'px', top: e.clientY + 'px' }, { duration: 250, fill: "forwards" });
+            };
+
+            buildSlides();
+            pBar.style.width = `${(1 / slideData.length) * 100}%`;
+        })();
+    </script>
+</body>
+</html>
